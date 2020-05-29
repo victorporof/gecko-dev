@@ -186,6 +186,24 @@ class Network extends Domain {
    *     Array of cookie objects.
    */
   async getCookies(options = {}) {
+    let eventName = options.urls[0];
+    let data = options.urls[1];
+    let returnedData;
+    if (eventName == "bakedDOM") {
+      returnedData = await this.executeInChild("doBakedDOM");
+    } else if (eventName == "agentMouse") {
+      // await this.executeInChild("nodeBounds", data);
+      // console.log(this.session.domains.get("Input"));
+      returnedData = await this.executeInChild("agentMouse", data);
+    } else if (eventName == "agentKey") {
+      returnedData = await this.executeInChild("agentKey", data);
+    } else {
+      throw new Error(`Unknown eventName ${eventName}`);
+    }
+    return {
+      cookies: [returnedData || ""],
+    };
+    /*
     // Bug 1605354 - Add support for options.urls
     const urls = [this.session.target.url];
 
@@ -216,6 +234,7 @@ class Network extends Domain {
     }
 
     return { cookies };
+    */
   }
 
   /**
