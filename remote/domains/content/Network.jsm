@@ -333,13 +333,12 @@ class DOMBaker {
         bucket.wrote.length ||
         bucket.updates.length
       ) {
-        return [bucket];
+        return bucket;
       }
-      return [];
     };
 
     const onMutations = mutationList => {
-      const mutations = mutationList.flatMap(handleMutation);
+      const mutations = mutationList.map(handleMutation).filter(bucket=>bucket);
       if (mutations.length) {
         this.network.emitToUAServer({
           overriddenType: "mutations",
