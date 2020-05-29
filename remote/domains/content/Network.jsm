@@ -356,6 +356,7 @@ class DOMBaker {
       subtree: true,
     });
   }
+
   deregisterNode(node) {
     const { $idsToNodes, $nodesToIds, $nodesToVirtualNodes } = this;
     const virtualNode = $nodesToVirtualNodes.get(node);
@@ -610,6 +611,11 @@ class DOMBaker {
 class Network extends ContentProcessDomain {
   // commands
 
+  constructor(...args) {
+    super(...args);
+    this._tips = new WeakMap();
+  }
+
   /**
    * Internal methods: the following methods are not part of CDP;
    * note the _ prefix.
@@ -641,20 +647,33 @@ class Network extends ContentProcessDomain {
   }
 
   agentKey(options = {}) {
+    let tip;
+
+    if (this._tips.has(this.content)) {
+      tip = this._tips.get(this.content);
+    } else {
+      tip = Cc["@mozilla.org/text-input-processor;1"].createInstance(
+        Ci.nsITextInputProcessor
+      );
+      tip.beginInputTransactionForTests(this.content, () => {});
+      this._tips.set(this.content, tip);
+    }
+
     let target = this.getNodeFromRemoteID(options.target);
-    let relatedTarget = this.getNodeFromRemoteID(options.relatedTarget);
     if (target) {
-      // XXX: This doesn't actually work.
-      // See EventUtils.synthesizeKey, perhaps:
-      // https://searchfox.org/mozilla-central/rev/9aa7bebfd169bc2ead00ef596498a406e56bbb85/testing/mochitest/tests/SimpleTest/EventUtils.js#1037
-      let event = new KeyboardEvent(options.type, {
+      const args = {
         bubbles: true,
         cancelable: true,
         view: target.ownerGlobal,
         target,
-        relatedTarget,
         ...options,
-      });
+      };
+      let event = new this.content.KeyboardEvent(options.type, args);
+      if (options.type == "keydown") {
+        tip.keydown(event);
+      } else if (options.type == "keyup") {
+        tip.keyup(event);
+      }
       target.dispatchEvent(event);
     }
   }
@@ -663,16 +682,36 @@ class Network extends ContentProcessDomain {
     let target = this.getNodeFromRemoteID(options.target);
     let relatedTarget = this.getNodeFromRemoteID(options.relatedTarget);
     if (target) {
-      target.dispatchEvent(
-        new MouseEvent(options.type, {
-          bubbles: true,
-          cancelable: true,
-          view: target.ownerGlobal,
-          target,
-          relatedTarget,
-          ...options,
-        })
-      );
+      const args = {
+        bubbles: true,
+        cancelable: true,
+        view: target.ownerGlobal,
+        target,
+        ...options,
+      };
+      if (relatedTarget) {
+        args.relatedTarget = relatedTarget;
+      }
+      target.dispatchEvent(new this.content.MouseEvent(options.type, args));
+    }
+  }
+
+  agentFocus(options = {}) {
+    let target = this.getNodeFromRemoteID(options.target);
+    let relatedTarget = this.getNodeFromRemoteID(options.relatedTarget);
+    if (target) {
+      const args = {
+        bubbles: true,
+        cancelable: true,
+        view: target.ownerGlobal,
+        target,
+        ...options,
+      };
+      if (relatedTarget) {
+        args.relatedTarget = relatedTarget;
+      }
+      target.focus();
+      target.dispatchEvent(new this.content.FocusEvent(options.type, args));
     }
   }
 
