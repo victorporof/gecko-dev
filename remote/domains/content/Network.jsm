@@ -563,12 +563,7 @@ class DOMBaker {
     if (node.isNativeAnonymous) {
       return;
     }
-    if (
-      node.tagName == "HEAD" ||
-      node.tagName == "SCRIPT" ||
-      node.tagName == "LINK" ||
-      node.tagName == "STYLE"
-    ) {
+    if (node.tagName == "HEAD") {
       // XXX: Should any of this come across?
       return;
     }
@@ -587,7 +582,13 @@ class DOMBaker {
       return;
     }
 
-    if (node.tagName == "IFRAME" || node.tagName == "VIDEO") {
+    if (
+      node.tagName == "IFRAME" ||
+      node.tagName == "VIDEO" ||
+      node.tagName == "SCRIPT" ||
+      node.tagName == "LINK" ||
+      node.tagName == "STYLE"
+    ) {
       // Put a placeholder to avoid messing up UA styles like
       // `body > h1:-moz-first-node` with markup like `<body><style><h1>`
       let virtualNode = {
@@ -596,7 +597,7 @@ class DOMBaker {
         parentID: parentTree.id,
         originalTag: node.tagName.toLowerCase(),
         IGNORE_CHILDREN: true,
-        tag: "div",
+        tag: "empty-placeholder",
         attributes: {},
       };
 
