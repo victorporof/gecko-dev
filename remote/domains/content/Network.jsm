@@ -696,6 +696,24 @@ class Network extends ContentProcessDomain {
     }
   }
 
+  agentSelect(options = {}) {
+    const selection = this.content.getSelection();
+    selection.removeAllRanges();
+
+    for (let props of options.ranges) {
+      const range = new this.content.Range();
+      range.setStart(
+        this.getNodeFromRemoteID(props.startContainer),
+        props.startOffset
+      );
+      range.setEnd(
+        this.getNodeFromRemoteID(props.endContainer),
+        props.endOffset
+      );
+      selection.addRange(range);
+    }
+  }
+
   agentFocus(options = {}) {
     let target = this.getNodeFromRemoteID(options.target);
     let relatedTarget = this.getNodeFromRemoteID(options.relatedTarget);

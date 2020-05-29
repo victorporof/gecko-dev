@@ -191,6 +191,8 @@ class Network extends Domain {
     let returnedData;
     if (eventName == "bakedDOM") {
       returnedData = await this.executeInChild("doBakedDOM");
+    } else if (eventName == "agentSelect") {
+      returnedData = await this.executeInChild("agentSelect", data);
     } else if (eventName == "agentFocus") {
       returnedData = await this.executeInChild("agentFocus", data);
     } else if (eventName == "agentChange") {
