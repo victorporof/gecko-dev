@@ -715,6 +715,21 @@ class Network extends ContentProcessDomain {
     }
   }
 
+  agentChange({ value, ...options } = {}) {
+    let target = this.getNodeFromRemoteID(options.target);
+    if (target) {
+      const args = {
+        bubbles: true,
+        cancelable: true,
+        view: target.ownerGlobal,
+        target,
+        ...options,
+      };
+      target.value = value;
+      target.dispatchEvent(new this.content.Event(options.type, args));
+    }
+  }
+
   createDOMStateForCurrentWindow() {
     let DOMState = contentDOMState.get(this.content);
     if (!contentDOMState.has(this.content)) {
