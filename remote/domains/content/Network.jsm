@@ -52,7 +52,6 @@ const WHITELISTED_ATTRS = new Set([
   "autofocus",
   "autoplay",
   "background",
-  "Note",
   "bgcolor",
   "border",
   "buffered",
@@ -60,7 +59,7 @@ const WHITELISTED_ATTRS = new Set([
   "charset",
   "checked",
   "cite",
-  "class",
+  // "class",
   "code",
   "codebase",
   "color",
@@ -172,6 +171,28 @@ const WHITELISTED_ATTRS = new Set([
   "width",
   "wrap",
 ]);
+
+// See https://searchfox.org/mozilla-central/rev/8827278483c337667cdfb238112eb1be397dd102/devtools/shared/css/generated/properties-db.js#10676
+const PSEUDO_ELEMENTS = [
+  ":after",
+  ":before",
+  ":marker",
+  ":backdrop",
+  ":cue",
+  ":first-letter",
+  ":first-line",
+  ":selection",
+  ":placeholder",
+  ":file-chooser-button",
+
+  // ":-moz-color-swatch",
+  // ":-moz-focus-inner",
+  // ":-moz-progress-bar",
+  // ":-moz-range-track",
+  // ":-moz-range-progress",
+  // ":-moz-range-thumb",
+  // ":-moz-meter-bar",
+];
 
 class DOMBaker {
   constructor(networkDomain) {
@@ -298,7 +319,7 @@ class DOMBaker {
       }
     };
 
-    const handleMutation = mutation => {
+    const handleMutation = (mutation) => {
       // For node types we don't handle yet, don't forward to the client
       if (!$nodesToIds.get(mutation.target)) {
         return;
@@ -337,8 +358,10 @@ class DOMBaker {
       }
     };
 
-    const onMutations = mutationList => {
-      const mutations = mutationList.map(handleMutation).filter(bucket=>bucket);
+    const onMutations = (mutationList) => {
+      const mutations = mutationList
+        .map(handleMutation)
+        .filter((bucket) => bucket);
       if (mutations.length) {
         this.network.emitToUAServer({
           overriddenType: "mutations",
@@ -390,8 +413,8 @@ class DOMBaker {
   }
 
   getSize(element) {
-    let px = number => number.toFixed(2) + "px";
-    let getBoundsWithoutFlushing = el =>
+    let px = (number) => number.toFixed(2) + "px";
+    let getBoundsWithoutFlushing = (el) =>
       el.ownerGlobal.windowUtils.getBoundsWithoutFlushing(el);
     let bounds = getBoundsWithoutFlushing(element);
     return {
@@ -402,7 +425,7 @@ class DOMBaker {
     };
   }
 
-  getStyles(node) {
+  getCSSText(node, pseudo = null) {
     function hasVisitedState(node) {
       if (!node) {
         return false;
@@ -424,7 +447,7 @@ class DOMBaker {
     // We could also just read all computed styles if we wanted
     const domRules = InspectorUtils.getCSSStyleRules(
       node,
-      null,
+      pseudo,
       hasVisitedState(node)
     );
 
@@ -440,6 +463,17 @@ class DOMBaker {
         continue;
       }
 
+      // if (true) {
+      //   // Don't include inherited rules if none of its properties
+      //   // are inheritable.
+      //   const hasInherited = [...domRule.style].some(prop =>
+      //     InspectorUtils.isInheritedProperty(prop)
+      //   );
+      //   if (!hasInherited) {
+      //     continue;
+      //   }
+      // }
+
       let cssText = domRule.style.cssText;
       if (cssText.includes("url(")) {
         // This is really bad and only handles background-image specifically.
@@ -452,15 +486,37 @@ class DOMBaker {
       rules.push(cssText);
     }
 
-    rules.push(node.style.cssText);
+    if (!pseudo) {
+      rules.push(node.style.cssText);
+    }
 
     return rules.join("");
+  }
+
+  getStyleRules(node) {
+    // If we need to get ahold of the actual ::before/after elements,
+    // see https://searchfox.org/mozilla-central/rev/8827278483c337667cdfb238112eb1be397dd102/devtools/server/actors/inspector/walker.js#1132-1145
+    // and https://searchfox.org/mozilla-central/rev/8827278483c337667cdfb238112eb1be397dd102/devtools/shared/inspector/css-logic.js#490
+    // But I believe we only need to get the style text for them:
+    const data = {};
+    data.elementStyles = this.getCSSText(node);
+    for (let pseudo of PSEUDO_ELEMENTS) {
+      let cssText = this.getCSSText(node, pseudo);
+      if (cssText) {
+        data[pseudo] = cssText;
+      }
+    }
+    return data;
   }
 
   getVirtualNodeBase(node) {
     let virtualNodeBase = {
       tag: node.tagName.toLowerCase(),
       size: this.getSize(node),
+      // Right now this is an object with cssText for each pseudo elt, along
+      // with the currently applied styles (elementStyles). Could consider
+      // making this more structured for finer grained diffing.
+      styleRules: this.getStyleRules(node),
       attributes: {},
       properties: {},
     };
@@ -474,9 +530,7 @@ class DOMBaker {
       }
       return returnedAttrs;
     }
-    Object.assign(virtualNodeBase.attributes, whitelistedAttrs(node), {
-      style: this.getStyles(node),
-    });
+    Object.assign(virtualNodeBase.attributes, whitelistedAttrs(node));
 
     // Resolve to absolute path for image src.
     // Note this doesn't handle srcset
