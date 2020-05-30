@@ -206,7 +206,7 @@ class DOMBaker {
   }
 
   static get events() {
-    return ["focus", "blur", "input", "change"];
+    return ["focus", "blur", "input", "change", "resize"];
   }
 
   handleEvent(event) {
