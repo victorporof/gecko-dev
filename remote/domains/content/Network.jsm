@@ -595,6 +595,7 @@ class DOMBaker {
         children: [],
         id: ExtensionUtils.getUniqueId(),
         parentID: parentTree.id,
+        nodeType: node.nodeType,
         originalTag: node.tagName.toLowerCase(),
         IGNORE_CHILDREN: true,
         tag: "empty-placeholder",
@@ -609,6 +610,7 @@ class DOMBaker {
       Object.assign(virtualNode, {
         id: ExtensionUtils.getUniqueId(),
         parentID: isDocElement ? null : parentTree.id,
+        nodeType: node.nodeType,
         children: [],
       });
       this.registerNode(node, virtualNode);
