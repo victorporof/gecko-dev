@@ -181,7 +181,7 @@ const PSEUDO_ELEMENTS = [
   ":cue",
   ":first-letter",
   ":first-line",
-  ":selection",
+  // ":selection", // Handle this separately.
   ":placeholder",
   ":file-chooser-button",
 
