@@ -319,7 +319,7 @@ class DOMBaker {
       }
     };
 
-    const handleMutation = (mutation) => {
+    const handleMutation = mutation => {
       // For node types we don't handle yet, don't forward to the client
       if (!$nodesToIds.get(mutation.target)) {
         return;
@@ -354,14 +354,15 @@ class DOMBaker {
         bucket.wrote.length ||
         bucket.updates.length
       ) {
+        // eslint-disable-next-line consistent-return
         return bucket;
       }
     };
 
-    const onMutations = (mutationList) => {
+    const onMutations = mutationList => {
       const mutations = mutationList
         .map(handleMutation)
-        .filter((bucket) => bucket);
+        .filter(bucket => bucket);
       if (mutations.length) {
         this.network.emitToUAServer({
           overriddenType: "mutations",
@@ -413,8 +414,8 @@ class DOMBaker {
   }
 
   getSize(element) {
-    let px = (number) => number.toFixed(2) + "px";
-    let getBoundsWithoutFlushing = (el) =>
+    let px = number => number.toFixed(2) + "px";
+    let getBoundsWithoutFlushing = el =>
       el.ownerGlobal.windowUtils.getBoundsWithoutFlushing(el);
     let bounds = getBoundsWithoutFlushing(element);
     return {
