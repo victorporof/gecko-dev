@@ -205,6 +205,10 @@ class Network extends Domain {
       returnedData = await this.executeInChild("agentKey", data);
     } else if (eventName == "agentScroll") {
       returnedData = await this.executeInChild("agentScroll", data);
+    } else if (eventName == "agentRtcIceCandidate") {
+      returnedData = await this.executeInChild("agentRtcIceCandidate", data);
+    } else if (eventName == "agentRtcAnswer") {
+      returnedData = await this.executeInChild("agentRtcAnswer", data);
     } else {
       throw new Error(`Unknown eventName ${eventName}`);
     }

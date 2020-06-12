@@ -201,6 +201,7 @@ class DOMBaker {
     this.doc = this.win.document;
 
     this.$idsToNodes = new Map();
+    this.$idsToPeerConnections = new Map();
     this.$nodesToIds = new WeakMap();
     this.$nodesToVirtualNodes = new WeakMap();
   }
@@ -533,6 +534,11 @@ class DOMBaker {
     }
     Object.assign(virtualNodeBase.attributes, whitelistedAttrs(node));
 
+    // Stream video and canvas.
+    if (virtualNodeBase.tag == "video" || virtualNodeBase.tag == "canvas") {
+      virtualNodeBase.isStreamable = true;
+    }
+
     // Resolve to absolute path for image src.
     // Note this doesn't handle srcset
     if (node.src) {
@@ -553,8 +559,10 @@ class DOMBaker {
     return virtualNodeBase;
   }
 
-  createVirtualNode(node) {
+  async createVirtualNode(node) {
     let { $nodesToVirtualNodes } = this;
+    let { $idsToPeerConnections } = this;
+
     let isDocElement = node == this.doc.documentElement;
     const parentTree = $nodesToVirtualNodes.get(node.parentNode);
     if ((!parentTree || parentTree.IGNORE_CHILDREN) && !isDocElement) {
@@ -585,7 +593,6 @@ class DOMBaker {
 
     if (
       node.tagName == "IFRAME" ||
-      node.tagName == "VIDEO" ||
       node.tagName == "SCRIPT" ||
       node.tagName == "LINK" ||
       node.tagName == "STYLE"
@@ -606,18 +613,46 @@ class DOMBaker {
       // XXX: move the parentTree.children positioning into registerNode
       this.registerNode(node, virtualNode);
       parentTree.children.push(virtualNode);
-    } else {
-      let virtualNode = this.getVirtualNodeBase(node);
-      Object.assign(virtualNode, {
-        id: ExtensionUtils.getUniqueId(),
-        parentID: isDocElement ? null : parentTree.id,
-        nodeType: node.nodeType,
-        children: [],
+      return;
+    }
+
+    let virtualNode = this.getVirtualNodeBase(node);
+    Object.assign(virtualNode, {
+      id: ExtensionUtils.getUniqueId(),
+      parentID: isDocElement ? null : parentTree.id,
+      nodeType: node.nodeType,
+      children: [],
+    });
+    this.registerNode(node, virtualNode);
+    if (!isDocElement) {
+      parentTree.children.push(virtualNode);
+    }
+
+    if (virtualNode.isStreamable) {
+      const peerConnection = new node.ownerGlobal.RTCPeerConnection();
+      $idsToPeerConnections.set(virtualNode.id, peerConnection);
+
+      peerConnection.onicecandidate = ({ candidate }) => {
+        this.network.emitToUAServer({
+          overriddenType: "rtc:ice-candidate",
+          data: { id: virtualNode.id, candidate },
+        });
+      };
+
+      const stream = node.captureStream
+        ? node.captureStream()
+        : node.mozCaptureStream();
+
+      console.log(stream.getTracks());
+      const tracks = stream.getVideoTracks();
+      tracks.forEach(track => peerConnection.addTrack(track, stream));
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      this.network.emitToUAServer({
+        overriddenType: "rtc:offer",
+        data: { id: virtualNode.id, offer },
       });
-      this.registerNode(node, virtualNode);
-      if (!isDocElement) {
-        parentTree.children.push(virtualNode);
-      }
     }
   }
 
@@ -694,6 +729,16 @@ class Network extends ContentProcessDomain {
     }
 
     return node || null;
+  }
+
+  getPeerConnectionFromRemoteID(remoteID) {
+    let DOMState = contentDOMState.get(this.content);
+    let peerConnection;
+    if (DOMState && remoteID) {
+      peerConnection = DOMState.$idsToPeerConnections.get(parseInt(remoteID));
+    }
+
+    return peerConnection || null;
   }
 
   emitToUAServer(message) {
@@ -819,6 +864,23 @@ class Network extends ContentProcessDomain {
       target.value = value;
       target.dispatchEvent(new this.content.Event(options.type, args));
     }
+  }
+
+  agentRtcIceCandidate({ id, candidate } = {}) {
+    if (!candidate) {
+      // Null means end-of-candidates notification.
+      return;
+    }
+    const peerConnection = this.getPeerConnectionFromRemoteID(id);
+    peerConnection.addIceCandidate(new this.content.RTCIceCandidate(candidate));
+  }
+
+  async agentRtcAnswer({ id, answer: description } = {}) {
+    const peerConnection = this.getPeerConnectionFromRemoteID(id);
+    const sessionDescription = new this.content.RTCSessionDescription(
+      description
+    );
+    await peerConnection.setRemoteDescription(sessionDescription);
   }
 
   createDOMStateForCurrentWindow() {
