@@ -866,6 +866,21 @@ class Network extends ContentProcessDomain {
     }
   }
 
+  agentInput({ value, ...options } = {}) {
+    let target = this.getNodeFromRemoteID(options.target);
+    if (target) {
+      const args = {
+        bubbles: true,
+        cancelable: true,
+        view: target.ownerGlobal,
+        target,
+        ...options,
+      };
+      target.value = value;
+      target.dispatchEvent(new this.content.Event(options.type, args));
+    }
+  }
+
   agentRtcIceCandidate({ id, candidate } = {}) {
     if (!candidate) {
       // Null means end-of-candidates notification.

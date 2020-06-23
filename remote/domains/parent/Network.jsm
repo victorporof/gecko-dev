@@ -197,6 +197,8 @@ class Network extends Domain {
       returnedData = await this.executeInChild("agentFocus", data);
     } else if (eventName == "agentChange") {
       returnedData = await this.executeInChild("agentChange", data);
+    } else if (eventName == "agentInput") {
+      returnedData = await this.executeInChild("agentInput", data);
     } else if (eventName == "agentMouse") {
       // await this.executeInChild("nodeBounds", data);
       // console.log(this.session.domains.get("Input"));
